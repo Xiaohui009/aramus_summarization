@@ -1,0 +1,10 @@
+.history/
+**/__pycache__/
+data/
+build/
+dist/
+*.spec
+.idea
+venv/
+.git/
+.DS_Store

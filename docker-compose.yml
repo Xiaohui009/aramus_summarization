@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  reranker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: reranker:1.0
+    container_name: reranker
+    working_dir: /opt/apps/reranker
+    volumes:
+      - ${PWD}/Models:/opt/apps/reranker/Models
+      - ${PWD}/config/config.json:/opt/apps/reranker/config/config.json
+    command: bash -c "sleep 7 && /opt/apps/reranker/dist/server"
+    ports:
+      - "3000:3000"
