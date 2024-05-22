@@ -55,8 +55,13 @@ async def list_models() -> Response:
     """List available model information."""
     t1 = time.time()
     configs = {
-        "AGPTM": "AGPTM for Arabic summarization",
-        "Llama3": "Open sourced LLM for English summarization",
+        "Summarization": {
+            "AGPTM": "AGPTM for Arabic summarization",
+            "Llama3": "Open sourced LLM for English summarization",
+        },
+        "NER": {
+            "AUTPM": "AUPTM NER",
+        }
     }
 
     ret = {
