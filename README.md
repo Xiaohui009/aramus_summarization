@@ -1,9 +1,10 @@
-# FastAPI base service template
-A template for quick deployment of fastAPI service. It serves as 
-the boilerplate for further fastAPI service development. 
+# Summarization and NER service
+This service calls AraMUS AGPTM for Arabic text summarization, Llama3 70B
+for other language text. 
 
-Do NOT change this code base. Rather, clone the code base and add
-more functions to fit your customized service.
+It also calls AraMUS AUPTM for entity extraction. For entity extraction,
+it iterates the first several paragraphs, if there exists an ORG entity,
+then it will be returned. It only returns the first occurrence of the ORG entity.
 
 ### How to run
 ```shell

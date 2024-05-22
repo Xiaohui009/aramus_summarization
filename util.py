@@ -11,15 +11,35 @@ import os
 import string
 import time
 import traceback
+import platform
 
+import nltk
+from pyarabic import araby
 import requests
+from langdetect import detect
 
 from logger import get_logger
 
 logging = get_logger(os.path.basename(__file__))
 
 
-def get_text(csv_reader, max_length=2048):
+def get_heading_and_content(csv_row, file_type):
+    if file_type in ['pdf']:
+        heading = "" if csv_row[1] == 'None' or not csv_row[1] else csv_row[1]
+        content = "" if csv_row[2] == 'None' or not csv_row[2] else csv_row[2]
+    elif file_type in ['word']:
+        heading = ""
+        for idx in range(1, 5):
+            heading += "" if csv_row[idx] == 'None' or not csv_row[idx] else csv_row[idx]
+        content = "" if csv_row[5] == 'None' or not csv_row[5] else csv_row[5]
+    else:
+        heading = ""
+        content = ""
+
+    return heading, content
+
+
+def get_summary_text_from_csv(csv_reader, file_type, max_length=2048):
     text = list()
     current_length = 0
     last_block = ""
@@ -27,27 +47,33 @@ def get_text(csv_reader, max_length=2048):
     # Skip header row
     header = next(csv_reader)
     for row in csv_reader:
-        heading = "" if row[1] == 'None' or not row[1] else row[1]
-        content = "" if row[2] == 'None' or not row[2] else row[2]
+        heading, content = get_heading_and_content(
+            csv_row=row,
+            file_type=file_type,
+        )
+
         heading = heading.translate(
             str.maketrans('', '', string.punctuation)
         )
         content = content.translate(
             str.maketrans('', '', string.punctuation)
         )
+
         heading_length = len(heading)
         content_length = len(content)
 
         if current_length + heading_length < max_length:
-            text.append(heading)
-            current_length += heading_length + 1
+            if heading:
+                text.append(heading)
+                current_length += heading_length + 1
         else:
             last_block = heading
             break
 
         if current_length + content_length < max_length:
-            text.append(content)
-            current_length += content_length + 1
+            if content:
+                text.append(content)
+                current_length += content_length + 1
         else:
             last_block = content
             break
@@ -85,19 +111,102 @@ def get_arabic_summary(text):
             response_result = json.loads(response.content)
             summary = response_result["summary"]
         else:
-            logging.error(f"No response from {AGPTM_SUMMARIZATION_URL}, status code = {response.status_code}")
+            logging.error(
+                f"No response from AGPTM summarization endpoint {AGPTM_SUMMARIZATION_URL}, status code = {response.status_code}")
             status = -1
-            message = f"No response from {AGPTM_SUMMARIZATION_URL}, status code = {response.status_code}"
+            message = f"No response from AGPTM summarization endpoint {AGPTM_SUMMARIZATION_URL}, status code = {response.status_code}"
     except Exception as e:
-        logging.error(f"Exception while calling AGPTM summarization {AGPTM_SUMMARIZATION_URL}. Exception {str(e)}")
+        logging.error(
+            f"Exception while calling AGPTM summarization endpoint {AGPTM_SUMMARIZATION_URL}. Exception {str(e)}")
         logging.info(f"Traceback info: {traceback.format_exc()}")
         status = -1
-        message = f"Exception while calling AGPTM summarization {AGPTM_SUMMARIZATION_URL}. Exception {str(e)}"
+        message = f"Exception while calling AGPTM summarization endpoint {AGPTM_SUMMARIZATION_URL}. Exception {str(e)}"
 
     return {
         "summary": summary if status == 0 else None,
         "status": status,
         "message": message,
+    }
+
+
+def get_ner_text_from_csv(csv_reader, file_type, max_length=42):
+    texts = list()
+    # Skip header row
+    header = next(csv_reader)
+
+    for row in csv_reader:
+        heading, content = get_heading_and_content(
+            csv_row=row,
+            file_type=file_type,
+        )
+
+        if len(texts) < max_length and heading:
+            texts.append(heading)
+        if len(texts) < max_length and content:
+            texts.append(content)
+
+    text = "\n".join(texts)
+
+    return text
+
+
+AUPTM_NER_URL = "http://37.224.68.138:8030/"
+
+
+def get_org_entity(text, max_sentences=19):
+    lang = detect(text=text)
+    if lang in ['ar']:
+        sentences = araby.sentence_tokenize(text)
+        logging.info(f"Number of Arabic sentences: {len(sentences)}")
+    else:
+        sentences = nltk.tokenize.sent_tokenize(text, language='english')
+        logging.info(f"Number of English sentences: {len(sentences)}")
+
+    sentences = sentences[:max_sentences]
+    ret = list()
+
+    status = 0
+    message = ""
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
+        logging.info(f"Extracting entities from {sentence}")
+
+        payload = {
+            "sentence": sentence,
+        }
+        try:
+            response = requests.post(
+                url=AUPTM_NER_URL,
+                json=payload,
+            )
+
+            if response.status_code == 200:
+                response_result = json.loads(response.content)
+                entities = response_result["entities"]
+
+                for entity in entities:
+                    logging.info(f"Entity type: {entity['label']}, mention: {entity['mention']}")
+                    if entity['label'] in ['ORG']:
+                        ret.append(entity['mention'])
+            else:
+                logging.error(
+                    f"No response from AUPTM NER endpoint {AUPTM_NER_URL}, status code = {response.status_code}")
+                status = -1
+                message = f"No response from AUPTM NER endpoint {AUPTM_NER_URL}, status code = {response.status_code}"
+        except Exception as e:
+            logging.error(
+                f"Exception while calling AUPTM NER endpoint {AUPTM_NER_URL}. Exception {str(e)}")
+            logging.info(f"Traceback info: {traceback.format_exc()}")
+            status = -1
+            message = f"Exception while calling AUPTM NER endpoint {AGPTM_SUMMARIZATION_URL}. Exception {str(e)}"
+
+    return {
+        "status": status,
+        "entity": ret[0] if ret else "",
+        "message": "" if ret else message,
     }
 
 
@@ -119,7 +228,8 @@ def get_openai_model_id(base_url: str) -> str:
     return model_id
 
 
-LLM_BASE_URL = "http://localhost:3070"
+# Llama3 70B openAI style API
+LLM_BASE_URL = "http://192.168.0.69:3070" if platform.system().lower() in ['linux'] else "http://localhost:3070"
 
 
 def get_other_summary(text):
@@ -160,14 +270,14 @@ Here is a summary of the text:
             response_content = response.json()
             summary = response_content["choices"][0]["text"]
         else:
-            logging.error(f"No response from {URL}, status code = {response.status_code}")
+            logging.error(f"No response from Llama3 endpoint {URL}, status code = {response.status_code}")
             status = -1
-            message = f"No response from {URL}, status code = {response.status_code}"
+            message = f"No response from Llama3 endpoint {URL}, status code = {response.status_code}"
     except Exception as e:
-        logging.error(f"Exception while calling LLM summarization {URL}. Exception {str(e)}")
+        logging.error(f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}")
         logging.info(f"Traceback info: {traceback.format_exc()}")
         status = -1
-        message = f"Exception while calling LLM summarization {URL}. Exception {str(e)}"
+        message = f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}"
 
     return {
         "summary": summary if status == 0 else None,
@@ -177,24 +287,18 @@ Here is a summary of the text:
 
 
 if __name__ == "__main__":
-    text_ar = "نيوم (بالإنجليزية: NEOM)‏ هو مشروع سعودي لمدينة مخطط لبنائها عابرة للحدود، أطلقه الأمير محمد بن سلمان " \
-              "آل سعود، ولي العهد السعودي في يوم الثلاثاء 4 صفر 1439 هـ الموافق 24 أكتوبر 2017 ويقع المشروع في أقصى " \
-              "شمال غرب المملكة العربية السعودية بـإمارة منطقة تبوك محافظة ضباء، ويمتد 460 كم على ساحل البحر الأحمر. " \
-              "ويهدف المشروع ضمن إطار التطلعات الطموحة لرؤية 2030 بتحويل المملكة إلى نموذجٍ عالمي رائد في مختلف جوانب " \
-              "الحياة، من خلال التركيز على استجلاب سلاسل القيمة في الصناعات والتقنية داخل المشروع وسيتم الانتهاء من " \
-              "المرحلة الأولى لـ«نيوم» بحلول عام 2025م. تم دعم المشروع من قبل صندوق الاستثمارات العامة السعودي بقيمة " \
-              "500 مليار دولار، والمستثمرين المحليين والعالميين. وتتولى «شركة نيوم» التي تأسست في يناير 2019 عمليات " \
-              "تطوير منطقة نيوم والإشراف عليها، وهي شركة مساهمة مقفلة برأس مال مدفوع بالكامل وتعود ملكيتها إلى صندوق " \
-              "الاستثمارات العامة. وستعمد الشركة إلى إنشاء مدن جديدة وبنية تحتية كاملة للمنطقة تشمل ميناءً، وشبكة " \
-              "مطارات، ومناطق صناعية، ومراكز للإبداع لدعم الفنون، ومراكز للابتكار تدعم قطاع الأعمال، إضافة إلى تطوير " \
-              "القطاعات الاقتصادية المستهدفة. وفي أكتوبر 2018 أعلن الرئيس التنفيذي للمشروع المهندس نظمي النصر عن " \
-              "تشغيل أول مطار في نيوم قبل نهاية 2018، ثم تسيير رحلات إسبوعية إليه مع بداية عام 2019، على أن يكون " \
-              "المطار واحدا من شبكة مطارات عدة سيتضمنها المشروع. وقد استقبل المطار الذي يحمل رمز مطار منظمة الطيران " \
-              "المدني الدولي والواقع في «شرما» أول رحلة للخطوط السعودية في 10 يناير 2019، عبر طائرتين تجاريتين من " \
-              "طراز إيرباص (آيه 320) تقلان 130 موظفا في المشروع. "
+    text_ar = "ليلى هي فتاة سعودية جميلة وذكية تعيش في مدينة الرياض مع عائلتها وكانت تدرس في إحدى المدارس الخاصة " \
+              "الرائدة في المدينة. كانت ليلى تحب القراءة والكتابة، وكانت تميل دائمًا إلى البحث عن المعلومات وتوسيع " \
+              "معرفتها.  كانت تحب الاطلاع على كل ما هو جديد في مجال العلوم والتكنولوجيا والثقافة. كانت ليلى دائمًا " \
+              "مليئة بالحيوية والنشاط، وكانت تشارك في العديد من الأنشطة الرياضية والثقافية في مدرستها. عندما تخرجت " \
+              "ليلى من المدرسة قررت الانتقال إلى جامعة في الولايات المتحدة الأمريكية لمواصلة دراستها. كانت هذه خطوة " \
+              "كبيرة بالنسبة لليلى، ولكنها كانت مستعدة للتحدي والاستكشاف والتعلم. بدأت ليلى دراسة العلوم الحاسوبية في " \
+              "الجامعة، وكانت تعمل بجد لتحقيق أهدافها الأكاديمية. كانت تلتقي بزملائها الدراسيين والأساتذة وتتعلم " \
+              "منهم، وكانت تشارك في العديد من الفعاليات الثقافية والاجتماعية التي تنظمها الجامعة وكونت من خلالها على " \
+              "الكثير من الصداقات. "
     summary_ar = get_arabic_summary(text=text_ar)
     print(f"Arabic summary: {summary_ar}")
-    print("="*30)
+    print("=" * 30)
 
     text_en = "ISO INTERNATIONAL STANDARD First edition 20140115 Asset management — Management systems — Requirements " \
               "Gestion d’actifs — Systèmes de management — Exigences Reference number ISO 550012014E Copyright " \
@@ -219,3 +323,12 @@ if __name__ == "__main__":
               "measurement analysis and evaluation 8 92 Internal audit 9 93 Ma "
     summary_en = get_other_summary(text=text_en)
     print(f"English summary: {summary_en}")
+    print("=" * 30)
+
+    org_entity = get_org_entity(text_ar)
+    print(f"Org entity for Arabic text: {org_entity}")
+    print("=" * 30)
+
+    org_entity = get_org_entity(text_en)
+    print(f"Org entity for English text: {org_entity}")
+    print("=" * 30)

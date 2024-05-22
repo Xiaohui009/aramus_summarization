@@ -26,7 +26,7 @@ from io import StringIO
 import csv
 from langdetect import detect
 
-from util import get_text, get_arabic_summary, get_other_summary
+from util import get_summary_text_from_csv, get_arabic_summary, get_other_summary, get_ner_text_from_csv, get_org_entity
 
 logging = get_logger(os.path.basename(__file__))
 
@@ -69,99 +69,203 @@ async def list_models() -> Response:
 
 
 example_input = {
-    "data_path": "aramus-qa/upload/default/2024-05-15/ISO 55001.csv",
+    "file_path": "aramus-qa/upload/default/2024-05-15/ISO 55001.csv",
+    "file_type": "pdf",
 }
 
 
 @app.post(
-    "/serve",
+    "/summarize",
     tags=["AraMUS summarization"],
     summary="AraMUS summarization for quick demo",
 )
-async def serve(request: Request, request_dict: JSONStructure = Body(..., example=example_input)) -> Response:
+async def summarize(request: Request, request_dict: JSONStructure = Body(..., example=example_input)) -> Response:
     """AraMUS summarization service, it utilizes AGPTM for Arabic summarization, and open source LLM for English
     summarization.
 
-    The request should be a JSON object with the following fields:
-    - data_path: obs path
+    The request should be a JSON object with `file_path` & `file_type` or `text` fields:
+    - file_path: obs path [Optional]
+    - file_type: `pdf`, `word` [Optional]
+    - text: long string representing document content [Optional]
     """
-    data_path = request_dict.get("data_path", None)
+    text_content = request_dict.get("text", None)
+    file_path = request_dict.get("file_path", None)
+    file_type = request_dict.get("file_type", None)
 
     request_id = str(uuid.uuid4())
 
     t1 = time.time()
+    base_info = {
+        "request_id": request_id,
+        "file_path": file_path if file_path else None,
+        "file_type": file_type if file_type else None,
+        "text": text_content if text_content else None,
+    }
 
-    if not data_path:
+    if not (file_path and file_type) and not text_content:
         ret = {
-            "request_id": request_id,
-            "data_path": data_path if data_path else None,
             "summary": None,
             "status": -1,
             "running_time": time.time() - t1,
-            "message": "A valid obs file path must be provided.",
+            "message": "A valid obs file path  & file_type or text content must be provided.",
         }
+        ret.update(base_info)
         return JSONResponse(ret)
 
     try:
-        response = obsClient.getObject(
-            BUCKET_NAME,
-            data_path,
-            loadStreamInMemory=True,
-        )
-
-        if response.status == 200:
-            data = response.body.buffer
-            data_io = StringIO(data.decode('utf-8'))
-            csv_reader = csv.reader(data_io)
-            text = get_text(csv_reader=csv_reader)
-            logging.info(f"Text: {text}")
-            lan = detect(text=text)
-            if 'ar' == lan:
-                # Arabic text goes to AGPTM
-                logging.info(f"{data_path} is Arabic document, calling AGPTM for summarization.")
-                ret = get_arabic_summary(
-                    text=text,
-                )
-            else:
-                # Other text goes to open source LLM
-                logging.info(f"{data_path} is Non-Arabic document, calling open-sourced LLM for summarization.")
-                ret = get_other_summary(
-                    text=text,
-                )
-            ret.update(
-                {
-                    "request_id": request_id,
-                    "data_path": data_path if data_path else None,
-                    "running_time": time.time() - t1,
-                }
-            )
-            return JSONResponse(ret)
+        if text_content:
+            text = text_content
         else:
-            ret = {
-                "request_id": request_id,
-                "data_path": data_path if data_path else None,
-                "summary": None,
-                "status": -1,
+            response = obsClient.getObject(
+                BUCKET_NAME,
+                file_path,
+                loadStreamInMemory=True,
+            )
+
+            if response.status == 200:
+                data = response.body.buffer
+                data_io = StringIO(data.decode('utf-8'))
+                csv_reader = csv.reader(data_io)
+                text = get_summary_text_from_csv(
+                    csv_reader=csv_reader,
+                    file_type=file_type,
+                )
+
+            else:
+                ret = {
+                    "summary": None,
+                    "status": -1,
+                    "running_time": time.time() - t1,
+                    "message": f"Something wrong during get {file_path} from OBS, status code {response.status}",
+                }
+                ret.update(base_info)
+                return JSONResponse(ret)
+
+        logging.info(f"Text: {text}")
+        lan = detect(text=text)
+        if 'ar' == lan:
+            # Arabic text goes to AGPTM
+            logging.info(f"{file_path if not text_content else '<INPUT TEXT>'} is Arabic document, calling AGPTM for "
+                         f"summarization.")
+            ret = get_arabic_summary(
+                text=text,
+            )
+        else:
+            # Other text goes to open source LLM
+            logging.info(f"{file_path if not text_content else '<INPUT TEXT>'} is Non-Arabic document, calling "
+                         f"open-sourced LLM for summarization.")
+            ret = get_other_summary(
+                text=text,
+            )
+        ret.update(
+            {
                 "running_time": time.time() - t1,
-                "message": f"Something wrong during get {data_path} from OBS, status code {response.status}",
             }
-            return JSONResponse(ret)
+        )
+        ret.update(base_info)
+        return JSONResponse(ret)
 
     except Exception as e:
-        logging.error(f"Exception while calling AraMUS semantic matching: {str(e)}")
+        logging.error(f"Exception while calling summarization: {str(e)}")
         logging.info(f"Traceback info: {traceback.format_exc()}")
-        status = -1
-        message = f"Exception while calling AraMUS semantic matching: {str(e)}"
 
         ret = {
-            "request_id": request_id,
-            "question": data_path if data_path else None,
             "summary": None,
-            "status": status,
+            "status": -1,
             "running_time": time.time() - t1,
-            "message": message,
+            "message": f"Exception while calling summarization: {str(e)}",
         }
+        ret.update(base_info)
+        return JSONResponse(ret)
 
+
+@app.post(
+    "/ner_tag",
+    tags=["AraMUS NER"],
+    summary="AraMUS NER tagging for quick demo",
+)
+async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., example=example_input)) -> Response:
+    """AraMUS NET tagging service, it utilizes AUPTM NER service to tag given content.
+
+    The request should be a JSON object with `file_path` & `file_type` or `text` fields:
+    - file_path: obs path [Optional]
+    - file_type: `pdf`, `word` [Optional]
+    - text: long string representing document content [Optional]
+    """
+    text_content = request_dict.get("text", None)
+    file_path = request_dict.get("file_path", None)
+    file_type = request_dict.get("file_type", None)
+
+    request_id = str(uuid.uuid4())
+
+    t1 = time.time()
+    base_info = {
+        "request_id": request_id,
+        "file_path": file_path if file_path else None,
+        "file_type": file_type if file_type else None,
+        "text": text_content if text_content else None,
+    }
+
+    if not (file_path and file_type) and not text_content:
+        ret = {
+            "entity": None,
+            "status": -1,
+            "running_time": time.time() - t1,
+            "message": "A valid obs file path  & file_type or text content must be provided.",
+        }
+        ret.update(base_info)
+        return JSONResponse(ret)
+
+    try:
+        if text_content:
+            text = text_content
+        else:
+            response = obsClient.getObject(
+                BUCKET_NAME,
+                file_path,
+                loadStreamInMemory=True,
+            )
+
+            if response.status == 200:
+                data = response.body.buffer
+                data_io = StringIO(data.decode('utf-8'))
+                csv_reader = csv.reader(data_io)
+                text = get_ner_text_from_csv(
+                    csv_reader=csv_reader,
+                    file_type=file_type,
+                )
+
+            else:
+                ret = {
+                    "entity": None,
+                    "status": -1,
+                    "running_time": time.time() - t1,
+                    "message": f"Something wrong during get {file_path} from OBS, status code {response.status}",
+                }
+                ret.update(base_info)
+                return JSONResponse(ret)
+
+        logging.info(f"Text: {text}")
+        ret = get_org_entity(text=text)
+        ret.update(
+            {
+                "running_time": time.time() - t1,
+            }
+        )
+        ret.update(base_info)
+        return JSONResponse(ret)
+
+    except Exception as e:
+        logging.error(f"Exception while calling AUPTM NER tagging: {str(e)}")
+        logging.info(f"Traceback info: {traceback.format_exc()}")
+
+        ret = {
+            "entity": None,
+            "status": -1,
+            "running_time": time.time() - t1,
+            "message": f"Exception while calling AUPTM NER tagging: {str(e)}",
+        }
+        ret.update(base_info)
         return JSONResponse(ret)
 
 
