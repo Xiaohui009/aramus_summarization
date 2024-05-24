@@ -156,6 +156,7 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
 
         logging.info(f"Text: {text}")
         lan = detect(text=text)
+        logging.info(f"Text language: {lan}")
         if 'ar' == lan and model_type in ['agptm']:
             # Arabic text goes to AGPTM
             logging.info(f"Model type {model_type}, {file_path if not text_content else '<INPUT TEXT>'} calling AGPTM "
