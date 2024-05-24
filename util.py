@@ -245,7 +245,7 @@ user input is in Arabic, make sure your response is in Arabic too.
         {
             "role": "system",
             # "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
-            "content": system_prompt_en.format(max_length=128)
+            "content": system_prompt_en.format(max_length=128) + "يرجى الإخراج باللغة العربية" if lan in ['ar'] else "",
         },
         {
             "role": "user",
