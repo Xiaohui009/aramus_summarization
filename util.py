@@ -240,11 +240,12 @@ def get_other_summary(text, lan='en'):
         {
             "role": "system",
             "content": system_prompt
-         },
+        },
         {
             "role": "user",
-            "content": """Context: {text}. Summary{language}: """.format(text=text, language=" in Arabic" if lan in ['ar'] else "")
-         }
+            "content": """Context: {text}. Summary{language}: """.format(text=text,
+                                                                         language=" in Arabic" if lan in ['ar'] else "")
+        }
     ]
     payload = {
         "messages": messages,
@@ -272,74 +273,6 @@ def get_other_summary(text, lan='en'):
             status = -1
             message = f"No response from Llama3 endpoint {URL}, status code = {response.status_code}"
 
-    except Exception as e:
-        logging.error(f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}")
-        logging.info(f"Traceback info: {traceback.format_exc()}")
-        status = -1
-        message = f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}"
-
-    return {
-        "summary": summary if status == 0 else None,
-        "status": status,
-        "message": message,
-    }
-
-
-def get_other_summary3(text, lan='en'):
-    system_prompt_en = """Summarize the user input in at most {max_length} words."""
-    system_prompt_ar = """تلخيص إدخال المستخدم بكلمات لا تزيد عن {max_length}، والإجابة باللغة العربية. يرجى التأكد 
-    من أن إجابتك ستكون باللغة العربية حصراً. """
-
-    messages = [
-        {
-            "role": "system",
-            "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
-            # "content": system_prompt_en.format(max_length=128) + "يرجى الإخراج باللغة العربية" if lan in ['ar'] else "",
-            # "content": system_prompt_en.format(max_length=128)
-        },
-        {
-            "role": "user",
-            "content": f"{text}"
-        },
-    ]
-    payload = {
-        "messages": messages,
-        "max_tokens": 256,
-        "temperature": 0.9,
-        "repetition_penalty": 1.2,
-        "stream": False,
-        "top_k": 50,
-        "top_p": 1,
-        "stop_token_ids": [128009],
-        "model": get_openai_model_id(base_url=LLM_BASE_URL),
-    }
-
-    URL = f"{LLM_BASE_URL}/v1/chat/completions"
-    summary = None
-    status = 0
-    message = ""
-    try:
-        loops = 2 if lan in ['ar'] else 1
-        for loop in loops:
-            response = requests.post(
-                url=URL,
-                json=payload,
-            )
-            if response.status_code == 200:
-                response_content = response.json()
-                summary = response_content["choices"][0]['message']['content']
-            else:
-                logging.error(f"No response from Llama3 endpoint {URL}, status code = {response.status_code}")
-                status = -1
-                message = f"No response from Llama3 endpoint {URL}, status code = {response.status_code}"
-                break
-            messages += [
-                response_content["choices"][0]['message'],
-                {
-                    'role': 'user',
-                    'content': 'يرجى الإخراج باللغة العربية:',
-                }
-            ]
     except Exception as e:
         logging.error(f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}")
         logging.info(f"Traceback info: {traceback.format_exc()}")

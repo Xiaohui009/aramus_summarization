@@ -8,6 +8,8 @@ running-config[dl].yml
 .DS_Store
 test/
 uploaded/
+ar-docs
+results.csv
 
 
 # C extensions
