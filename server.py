@@ -7,6 +7,7 @@
 @description:
 """
 import argparse
+import copy
 import json
 import os
 import time
@@ -27,7 +28,7 @@ import csv
 from langdetect import detect
 
 from util import get_summary_text_from_csv, get_arabic_summary, get_other_summary, get_ner_text_from_csv, \
-    get_org_entity, filter_NER
+    get_org_entity, filter_NER, ENTITY_LOOKUP_TABLE
 
 logging = get_logger(os.path.basename(__file__))
 
@@ -221,9 +222,15 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
     else:
         filters = []
 
-    filter_set = {'NEOM', 'Neom', 'neom', 'wikipedia'}
+    entity_lookup_table = copy.deepcopy(ENTITY_LOOKUP_TABLE)
     for _filter in filters:
-        filter_set.add(_filter)
+        _filter = _filter.strip()
+        if len(_filter) > 0:
+            key = _filter.lower()
+            value = _filter
+            entity_lookup_table[key] = value
+
+    entity_candidates = set(entity_lookup_table.keys())
 
     request_id = str(uuid.uuid4())
 
@@ -280,12 +287,13 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
         logging.info(f"Raw NER: {ret}")
         entity = ret.get("entity", "")
         if entity:
-            logging.info(f"NER filtering for {entity} in set {filter_set}")
-            filtered_entity = filter_NER(entity=entity, candidates=filter_set)
-            logging.info(f"Filtered entity: {filtered_entity}")
+            logging.info(f"NER filtering for {entity} in set {entity_candidates}")
+            filtered_entity = filter_NER(entity=entity.lower(), candidates=entity_candidates)
+            entity_value = entity_lookup_table[filtered_entity]
+            logging.info(f"Filtered entity key {filtered_entity} value {entity_value}")
             ret.update(
                 {
-                    "entity": filtered_entity,
+                    "entity": entity_value,
                 }
             )
 

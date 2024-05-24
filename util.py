@@ -312,7 +312,7 @@ Here is a summary of the text:
     payload = {
         "prompt": prompt,
         "max_tokens": 256,
-        "temperature": 0.9,
+        "temperature": 0,
         "repetition_penalty": 1.2,
         "stream": False,
         "top_k": 50,
@@ -367,6 +367,24 @@ def filter_NER(entity, candidates):
 
     return ret
 
+
+def load_predefined_entity(fn="entities.txt"):
+    entity_dict = dict()
+    logging.info(f"Loading predefined entity from {fn}")
+    with open(fn, "r", encoding="utf-8") as fp:
+        for line in fp:
+            line = line.strip()
+            if len(line) > 0:
+                key = line.lower()
+                value = line
+                entity_dict[key] = value
+
+    logging.info(f"{len(entity_dict)} entities loaded")
+
+    return entity_dict
+
+
+ENTITY_LOOKUP_TABLE = load_predefined_entity()
 
 if __name__ == "__main__":
     text_ar = "ليلى هي فتاة سعودية جميلة وذكية تعيش في مدينة الرياض مع عائلتها وكانت تدرس في إحدى المدارس الخاصة " \
