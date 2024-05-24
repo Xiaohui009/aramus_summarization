@@ -233,19 +233,15 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 
 def get_other_summary(text, lan='en'):
-    system_prompt_en = """Your task is to generate a concise summary of the provided text. Summarize it in no more 
- than {max_length} words. Only summarize the given text; do not include anything that is not part of the summary. If the 
- user input is in Arabic, ensure that your response is exclusively in Arabic, without including any other language 
- in your response. """
-#     system_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيصها في {max_length} من الكلمات على الأكثر. قم
-#     بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! يرجى الإخراج باللغة العربية:
-# """
+    system_prompt_en = """Summarize the user input in at most {max_length} words."""
+    system_prompt_ar = """تلخيص إدخال المستخدم بكلمات لا تزيد عن {max_length}، والإجابة باللغة العربية. يرجى التأكد 
+    من أن إجابتك ستكون باللغة العربية حصراً. """
 
     messages = [
         {
             "role": "system",
-            # "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
-            "content": system_prompt_en.format(max_length=128) + "يرجى الإخراج باللغة العربية" if lan in ['ar'] else "",
+            "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
+            # "content": system_prompt_en.format(max_length=128) + "يرجى الإخراج باللغة العربية" if lan in ['ar'] else "",
             # "content": system_prompt_en.format(max_length=128)
         },
         {
