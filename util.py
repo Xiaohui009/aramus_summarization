@@ -233,10 +233,10 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 
 def get_other_summary(text, lan='en'):
-    system_prompt_en = """Your task is to generate a short summary of given text. Summarize it in at most 
-{max_length} words. Only summarize the given text, DO NOT put anything else that are not the summary of the text! If 
-user input is in Arabic, make sure you ONLY response in Arabic, absolutely no other languages!
-"""
+    system_prompt_en = """Your task is to generate a concise summary of the provided text. Summarize it in no more 
+ than {max_length} words. Only summarize the given text; do not include anything that is not part of the summary. If the 
+ user input is in Arabic, ensure that your response is exclusively in Arabic, without including any other language 
+ in your response. """
 #     system_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيصها في {max_length} من الكلمات على الأكثر. قم
 #     بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! يرجى الإخراج باللغة العربية:
 # """
