@@ -234,16 +234,18 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 def get_other_summary(text, lan='en'):
     system_prompt_en = """Your task is to generate a short summary of given text. Summarize it in at most 
-{max_length} words. Only summarize the given text, DO NOT put anything else that are not the summary of the text! 
+{max_length} words. Only summarize the given text, DO NOT put anything else that are not the summary of the text! If 
+user input is in Arabic, make sure your response is in Arabic too.
 """
-    system_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيصها في {max_length} من الكلمات على الأكثر. قم 
-    بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! يرجى الإخراج باللغة العربية:
-"""
+#     system_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيصها في {max_length} من الكلمات على الأكثر. قم
+#     بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! يرجى الإخراج باللغة العربية:
+# """
 
     messages = [
         {
             "role": "system",
-            "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
+            # "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
+            "content": system_prompt_en.format(max_length=128)
         },
         {
             "role": "user",
@@ -273,7 +275,7 @@ def get_other_summary(text, lan='en'):
         )
         if response.status_code == 200:
             response_content = response.json()
-            summary = response_content["choices"][0]["text"]
+            summary = response_content["choices"][0]['message']['content']
         else:
             logging.error(f"No response from Llama3 endpoint {URL}, status code = {response.status_code}")
             status = -1
