@@ -77,6 +77,7 @@ async def list_models() -> Response:
 example_input = {
     "file_path": "aramus-qa/upload/default/2024-05-15/ISO 55001.csv",
     "file_type": "pdf",
+    "modle_type": "llama3",
 }
 
 
@@ -93,6 +94,7 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
     - file_path: obs path [Optional]
     - file_type: `pdf`, `word` [Optional]
     - text: long string representing document content [Optional]
+    - model_type: one of `llama3` or `agptm`
     """
     text_content = request_dict.get("text", None)
     file_path = request_dict.get("file_path", None)
@@ -172,8 +174,10 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
                 text=text,
                 lan=lan,
             )
+            model_type = 'llama3'
         ret.update(
             {
+                "model_type": model_type,
                 "running_time": time.time() - t1,
             }
         )
