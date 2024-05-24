@@ -233,18 +233,27 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 
 def get_other_summary(text, lan='en'):
-    summarization_prompt = """Your task is to generate a short summary of given text. Summarize the text below, 
+    summarization_prompt_en = """Your task is to generate a short summary of given text. Summarize the text below, 
 delimited by triple backticks, in at most {max_length} words. Only summarize the given text, DO NOT put anything else
 that are not the summary of the text! Your response must be in the same language with the text.
  
 Text: ```{text}```
 
-{sub_prompt}
+Here is a summary of the text:
 """
+    summarization_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيص النص أدناه، مع تحديده بعلامات نقر 
+    ثلاثية، بكلمات يبلغ عددها {max_length} على الأكثر. قم بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! 
+    يجب أن يكون ردك بنفس لغة النص. 
+ 
+النص: ```{text}```
+
+يرجى الإخراج باللغة العربية:
+"""
+    summarization_prompt = summarization_prompt_ar if lan in ['ar'] else summarization_prompt_en
+    logging.info(f"lan={lan}, prompt in {'Arabic' if lan in ['ar'] else 'English'}")
     prompt = summarization_prompt.format(
         max_length=128,
         text=text,
-        sub_prompt="Here is a summary of the text:" if lan not in ['ar'] else "يرجى الإخراج باللغة العربية:",
     )
     payload = {
         "prompt": prompt,
