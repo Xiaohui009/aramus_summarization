@@ -229,7 +229,7 @@ def get_openai_model_id(base_url: str) -> str:
 
 
 # Llama3 70B openAI style API
-LLM_BASE_URL = "http://192.168.0.69:3070" if platform.system().lower() in ['linux'] else "http://localhost:3070"
+LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linux'] else "http://localhost:3070"
 
 
 def get_other_summary(text, language="English"):
@@ -316,7 +316,11 @@ if __name__ == "__main__":
               "منهم، وكانت تشارك في العديد من الفعاليات الثقافية والاجتماعية التي تنظمها الجامعة وكونت من خلالها على " \
               "الكثير من الصداقات. "
     summary_ar = get_arabic_summary(text=text_ar)
-    print(f"Arabic summary: {summary_ar}")
+    print(f"Arabic summary by AGPTM: {summary_ar}")
+    print("=" * 30)
+
+    summary_ar = get_other_summary(text=text_ar, language="Arabic")
+    print(f"Arabic summary by LLaMA3: {summary_ar}")
     print("=" * 30)
 
     text_en = "ISO INTERNATIONAL STANDARD First edition 20140115 Asset management — Management systems — Requirements " \

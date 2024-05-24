@@ -216,7 +216,7 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
     else:
         filters = []
 
-    filter_set = {'NEOM', 'wikipedia'}
+    filter_set = {'NEOM', 'Neom', 'neom', 'wikipedia'}
     for _filter in filters:
         filter_set.add(_filter)
 
