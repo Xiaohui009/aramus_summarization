@@ -156,7 +156,7 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
 
         logging.info(f"Text: {text}")
         lan = detect(text=text)
-        if 'ar' == lan and model_type not in ['llama3']:
+        if 'ar' == lan and model_type in ['agptm']:
             # Arabic text goes to AGPTM
             logging.info(f"Model type {model_type}, {file_path if not text_content else '<INPUT TEXT>'} calling AGPTM "
                          f"for summarization.")
@@ -169,7 +169,7 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
                          f"open-sourced LLM for summarization.")
             ret = get_other_summary(
                 text=text,
-                language="Arabic" if 'ar' == lan else "English",
+                lan=lan,
             )
         ret.update(
             {

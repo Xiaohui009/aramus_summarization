@@ -232,19 +232,19 @@ def get_openai_model_id(base_url: str) -> str:
 LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linux'] else "http://localhost:3070"
 
 
-def get_other_summary(text, language="English"):
+def get_other_summary(text, lan='en'):
     summarization_prompt = """Your task is to generate a short summary of given text. Summarize the text below, 
 delimited by triple backticks, in at most {max_length} words. Only summarize the given text, DO NOT put anything else
 that are not the summary of the text! Your response must be in the same language with the text.
  
 Text: ```{text}```
 
-Here is a summary of the text in {lan}:
+{sub_prompt}
 """
     prompt = summarization_prompt.format(
         max_length=128,
         text=text,
-        lan=language,
+        sub_prompt="Here is a summary of the text:" if lan not in ['ar'] else "يرجى الإخراج باللغة العربية:",
     )
     payload = {
         "prompt": prompt,
@@ -319,7 +319,7 @@ if __name__ == "__main__":
     print(f"Arabic summary by AGPTM: {summary_ar}")
     print("=" * 30)
 
-    summary_ar = get_other_summary(text=text_ar, language="Arabic")
+    summary_ar = get_other_summary(text=text_ar, lan='ar')
     print(f"Arabic summary by LLaMA3: {summary_ar}")
     print("=" * 30)
 
