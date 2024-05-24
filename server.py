@@ -270,7 +270,9 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
                 return JSONResponse(ret)
 
         logging.info(f"Text: {text}")
+        logging.info(f"{file_path if not text_content else '<INPUT TEXT>'} NER")
         ret = get_org_entity(text=text)
+        logging.info(f"Raw NER: {ret}")
         entity = ret.get("entity", "")
         if entity:
             logging.info(f"NER filtering for {entity} in set {filter_set}")
