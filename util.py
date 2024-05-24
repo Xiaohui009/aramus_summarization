@@ -249,7 +249,7 @@ user input is in Arabic, make sure your response is in Arabic too.
         },
         {
             "role": "user",
-            "content": text
+            "content": f"Text: {text} Summarize:"
         },
     ]
     payload = {
