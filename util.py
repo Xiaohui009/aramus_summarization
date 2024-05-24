@@ -233,7 +233,8 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 
 def get_other_summary(text, lan='en'):
-    system_prompt = "Summarize the context in less than 10 sentences. If the context is in arabic, the summarize need to be arabic as well."
+    system_prompt = "Summarize the context in less than 10 sentences. If the context is in Arabic, the summary must " \
+                    "be in Arabic as well. DO NOT put anything else that are not the summary of the text! "
 
     messages = [
         {
@@ -242,7 +243,7 @@ def get_other_summary(text, lan='en'):
          },
         {
             "role": "user",
-            "content": """Context: {text}. Summarize: """.format(text=text)
+            "content": """Context: {text}. Summary{language}: """.format(text=text, language=" in Arabic" if lan in ['ar'] else "")
          }
     ]
     payload = {
