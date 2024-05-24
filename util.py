@@ -233,10 +233,69 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 
 def get_other_summary(text, lan='en'):
+    system_prompt_en = """Your task is to generate a short summary of given text. Summarize it in at most 
+{max_length} words. Only summarize the given text, DO NOT put anything else that are not the summary of the text! 
+"""
+    system_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيصها في {max_length} من الكلمات على الأكثر. قم 
+    بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! يرجى الإخراج باللغة العربية:
+"""
+
+    messages = [
+        {
+            "role": "system",
+            "content": f"{system_prompt_ar.format(max_length=128) if lan in ['ar'] else system_prompt_en.format(max_length=128)}"
+        },
+        {
+            "role": "user",
+            "content": text
+        },
+    ]
+    payload = {
+        "messages": messages,
+        "max_tokens": 256,
+        "temperature": 0.9,
+        "repetition_penalty": 1.2,
+        "stream": False,
+        "top_k": 50,
+        "top_p": 1,
+        "stop_token_ids": [128009],
+        "model": get_openai_model_id(base_url=LLM_BASE_URL),
+    }
+
+    URL = f"{LLM_BASE_URL}/v1/chat/completions"
+    summary = None
+    status = 0
+    message = ""
+    try:
+        response = requests.post(
+            url=URL,
+            json=payload,
+        )
+        if response.status_code == 200:
+            response_content = response.json()
+            summary = response_content["choices"][0]["text"]
+        else:
+            logging.error(f"No response from Llama3 endpoint {URL}, status code = {response.status_code}")
+            status = -1
+            message = f"No response from Llama3 endpoint {URL}, status code = {response.status_code}"
+    except Exception as e:
+        logging.error(f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}")
+        logging.info(f"Traceback info: {traceback.format_exc()}")
+        status = -1
+        message = f"Exception while calling Llama3 endpoint {URL}. Exception {str(e)}"
+
+    return {
+        "summary": summary if status == 0 else None,
+        "status": status,
+        "message": message,
+    }
+
+
+def get_other_summary2(text, lan='en'):
     summarization_prompt_en = """Your task is to generate a short summary of given text. Summarize the text below, 
 delimited by triple backticks, in at most {max_length} words. Only summarize the given text, DO NOT put anything else
 that are not the summary of the text! Your response must be in the same language with the text.
- 
+
 Text: ```{text}```
 
 Here is a summary of the text:
@@ -244,7 +303,7 @@ Here is a summary of the text:
     summarization_prompt_ar = """مهمتك هي إنشاء ملخص قصير للنص المحدد. قم بتلخيص النص أدناه، مع تحديده بعلامات نقر 
     ثلاثية، بكلمات يبلغ عددها {max_length} على الأكثر. قم بتلخيص النص المحدد فقط، ولا تضع أي شيء آخر ليس ملخصًا للنص! 
     يجب أن يكون ردك بنفس لغة النص. 
- 
+
 النص: ```{text}```
 
 يرجى الإخراج باللغة العربية:
@@ -294,7 +353,6 @@ Here is a summary of the text:
         "status": status,
         "message": message,
     }
-
 
 def filter_NER(entity, candidates):
     if entity in candidates or not candidates:
