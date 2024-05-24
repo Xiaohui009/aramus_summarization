@@ -26,7 +26,8 @@ from io import StringIO
 import csv
 from langdetect import detect
 
-from util import get_summary_text_from_csv, get_arabic_summary, get_other_summary, get_ner_text_from_csv, get_org_entity
+from util import get_summary_text_from_csv, get_arabic_summary, get_other_summary, get_ner_text_from_csv, \
+    get_org_entity, filter_NER
 
 logging = get_logger(os.path.basename(__file__))
 
@@ -96,6 +97,13 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
     text_content = request_dict.get("text", None)
     file_path = request_dict.get("file_path", None)
     file_type = request_dict.get("file_type", None)
+    model_type = request_dict.get("model_type", None)
+
+    if model_type:
+        model_type = model_type.strip().lower()
+        if model_type not in {"llama3", "agptm"}:
+            logging.info(f"Invalid model type {model_type}, use default `llama3`")
+            model_type = 'llama3'
 
     request_id = str(uuid.uuid4())
 
@@ -148,19 +156,20 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
 
         logging.info(f"Text: {text}")
         lan = detect(text=text)
-        if 'ar' == lan:
+        if 'ar' == lan and model_type not in ['llama3']:
             # Arabic text goes to AGPTM
-            logging.info(f"{file_path if not text_content else '<INPUT TEXT>'} is Arabic document, calling AGPTM for "
-                         f"summarization.")
+            logging.info(f"Model type {model_type}, {file_path if not text_content else '<INPUT TEXT>'} calling AGPTM "
+                         f"for summarization.")
             ret = get_arabic_summary(
                 text=text,
             )
         else:
             # Other text goes to open source LLM
-            logging.info(f"{file_path if not text_content else '<INPUT TEXT>'} is Non-Arabic document, calling "
+            logging.info(f"Model type {model_type}, {file_path if not text_content else '<INPUT TEXT>'} calling "
                          f"open-sourced LLM for summarization.")
             ret = get_other_summary(
                 text=text,
+                language="Arabic" if 'ar' == lan else "English",
             )
         ret.update(
             {
@@ -200,6 +209,16 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
     text_content = request_dict.get("text", None)
     file_path = request_dict.get("file_path", None)
     file_type = request_dict.get("file_type", None)
+    filters = request_dict.get("filters", None)
+    if filters:
+        if isinstance(str, filters):
+            filters = [filters]
+    else:
+        filters = []
+
+    filter_set = {'NEOM', 'wikipedia'}
+    for _filter in filters:
+        filter_set.add(_filter)
 
     request_id = str(uuid.uuid4())
 
@@ -252,6 +271,17 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
 
         logging.info(f"Text: {text}")
         ret = get_org_entity(text=text)
+        entity = ret.get("entity", "")
+        if entity:
+            logging.info(f"NER filtering for {entity} in set {filter_set}")
+            filtered_entity = filter_NER(entity=entity, candidates=filter_set)
+            logging.info(f"Filtered entity: {filtered_entity}")
+            ret.update(
+                {
+                    "entity": filtered_entity,
+                }
+            )
+
         ret.update(
             {
                 "running_time": time.time() - t1,

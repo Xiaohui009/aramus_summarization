@@ -17,7 +17,7 @@ import nltk
 from pyarabic import araby
 import requests
 from langdetect import detect
-
+import Levenshtein
 from logger import get_logger
 
 logging = get_logger(os.path.basename(__file__))
@@ -232,18 +232,19 @@ def get_openai_model_id(base_url: str) -> str:
 LLM_BASE_URL = "http://192.168.0.69:3070" if platform.system().lower() in ['linux'] else "http://localhost:3070"
 
 
-def get_other_summary(text):
+def get_other_summary(text, language="English"):
     summarization_prompt = """Your task is to generate a short summary of given text. Summarize the text below, 
 delimited by triple backticks, in at most {max_length} words. Only summarize the given text, DO NOT put anything else
-that are not the summary of the text!
+that are not the summary of the text! Your response must be in the same language with the text.
  
 Text: ```{text}```
 
-Here is a summary of the text:
+Here is a summary of the text in {lan}:
 """
     prompt = summarization_prompt.format(
         max_length=128,
         text=text,
+        lan=language,
     )
     payload = {
         "prompt": prompt,
@@ -284,6 +285,24 @@ Here is a summary of the text:
         "status": status,
         "message": message,
     }
+
+
+def filter_NER(entity, candidates):
+    if entity in candidates or not candidates:
+        return entity
+
+    results = list()
+    for candidate in candidates:
+        d = Levenshtein.distance(entity, candidate)
+        results.append((candidate, d))
+
+    results = sorted(results, key=lambda x: x[1], reverse=False)
+    threshold = int(len(entity) * 0.3)
+    ret, min_dist = results[0]
+    if min_dist > threshold:
+        ret = ""
+
+    return ret
 
 
 if __name__ == "__main__":
@@ -331,4 +350,11 @@ if __name__ == "__main__":
 
     org_entity = get_org_entity(text_en)
     print(f"Org entity for English text: {org_entity}")
+    print("=" * 30)
+
+    entity = filter_NER(
+        entity=" ماانواع ال انتخابات,",
+        candidates={"wikipedia hospital", 'wikipedia', 'ماانواع الانتخابات'},
+    )
+    print(f"Entity: {entity}")
     print("=" * 30)
