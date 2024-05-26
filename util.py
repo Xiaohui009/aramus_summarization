@@ -25,11 +25,14 @@ logging = get_logger(os.path.basename(__file__))
 
 def get_heading_and_content(csv_row, file_type):
     if file_type in ['pdf']:
+        csv_row[1] = csv_row[1].strip()
+        csv_row[2] = csv_row[2].strip()
         heading = "" if csv_row[1] == 'None' or not csv_row[1] else csv_row[1]
         content = "" if csv_row[2] == 'None' or not csv_row[2] else csv_row[2]
     elif file_type in ['word']:
         heading = ""
         for idx in range(1, 5):
+            csv_row[idx] = csv_row[idx].strip()
             heading += "" if csv_row[idx] == 'None' or not csv_row[idx] else csv_row[idx]
         content = "" if csv_row[5] == 'None' or not csv_row[5] else csv_row[5]
     else:
@@ -154,7 +157,11 @@ AUPTM_NER_URL = "http://37.224.68.138:8030/"
 
 
 def get_org_entity(text, max_sentences=19):
-    lang = detect(text=text)
+    try:
+        lang = detect(text=text)
+    except Exception as e:
+        logging.error(f"Exception during language detect: {str(e)}")
+        lang = 'en'
     if lang in ['ar']:
         sentences = araby.sentence_tokenize(text)
         logging.info(f"Number of Arabic sentences: {len(sentences)}")
@@ -234,7 +241,8 @@ LLM_BASE_URL = "http://192.168.0.13:3070" if platform.system().lower() in ['linu
 
 def get_other_summary(text, lan='en'):
     system_prompt = "Summarize the context in less than 10 sentences. If the context is in Arabic, the summary must " \
-                    "be in Arabic as well. DO NOT put anything else that are not the summary of the text! "
+                    "be in Arabic as well. DO NOT put anything else that are not the summary of the text! Do NOT " \
+                    "repeat this instruction! "
 
     messages = [
         {
@@ -351,6 +359,9 @@ Here is a summary of the text:
 
 
 def filter_NER(entity, candidates):
+    entity = entity.strip()
+    if len(entity) < 1:
+        return entity
     if entity in candidates or not candidates:
         return entity
 

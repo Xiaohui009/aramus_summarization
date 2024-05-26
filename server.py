@@ -130,7 +130,7 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
 
     try:
         if text_content:
-            text = text_content
+            text = text_content[:7168]
         else:
             response = obsClient.getObject(
                 BUCKET_NAME,
@@ -158,7 +158,11 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
                 return JSONResponse(ret)
 
         logging.info(f"Text: {text}")
-        lan = detect(text=text)
+        try:
+            lan = detect(text=text)
+        except Exception as e:
+            logging.error(f"Exception during language detect: {str(e)}")
+            lan = 'en'
         logging.info(f"Text language: {lan}")
         if 'ar' == lan and model_type in ['agptm']:
             # Arabic text goes to AGPTM
@@ -289,7 +293,7 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
         if entity:
             logging.info(f"NER filtering for {entity} in set {entity_candidates}")
             filtered_entity = filter_NER(entity=entity.lower(), candidates=entity_candidates)
-            entity_value = entity_lookup_table[filtered_entity]
+            entity_value = entity_lookup_table.get(filtered_entity, None)
             logging.info(f"Filtered entity key {filtered_entity} value {entity_value}")
             ret.update(
                 {
