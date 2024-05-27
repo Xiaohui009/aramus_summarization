@@ -156,8 +156,8 @@ async def summarize(request: Request, request_dict: JSONStructure = Body(..., ex
                 }
                 ret.update(base_info)
                 return JSONResponse(ret)
-
-        logging.info(f"Text: {text}")
+        if not text or len(text) == 0:
+            logging.info(f"Text is empty: text = {text!r}")
         try:
             lan = detect(text=text)
         except Exception as e:
@@ -258,7 +258,7 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
 
     try:
         if text_content:
-            text = text_content
+            text = text_content[:4096]
         else:
             response = obsClient.getObject(
                 BUCKET_NAME,
@@ -285,7 +285,8 @@ async def ner_tag(request: Request, request_dict: JSONStructure = Body(..., exam
                 ret.update(base_info)
                 return JSONResponse(ret)
 
-        logging.info(f"Text: {text}")
+        if not text or len(text) == 0:
+            logging.info(f"Text is empty: text = {text!r}")
         logging.info(f"{file_path if not text_content else '<INPUT TEXT>'} NER")
         ret = get_org_entity(text=text)
         logging.info(f"Raw NER: {ret}")
