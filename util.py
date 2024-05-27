@@ -23,7 +23,52 @@ from logger import get_logger
 logging = get_logger(os.path.basename(__file__))
 
 
-def get_heading_and_content(csv_row, file_type):
+def get_heading_and_content_idx(csv_header):
+    heading_idx = list()
+    content_idx = list()
+
+    if csv_header:
+        idx = 0
+        for value in csv_header:
+            value = value.strip().lower()
+            if value:
+                if 'heading' in value:
+                    heading_idx.append(idx)
+                elif 'content' in value:
+                    content_idx.append(idx)
+        idx += 1
+    logging.info(f"Input header: {csv_header}")
+    logging.info(f"Heading idx: {heading_idx}, content idx: {content_idx}")
+
+    return heading_idx, content_idx
+
+
+def get_heading_and_content(csv_row, file_type, heading_idx, content_idx, ):
+    if file_type in ['pdf']:
+        if not heading_idx:
+            heading_idx = [1]
+        if not content_idx:
+            content_idx = [len(heading_idx) + 1]
+    elif file_type in ['word']:
+        if not heading_idx:
+            heading_idx = list(range(1, 5))
+        if not content_idx:
+            content_idx = [len(heading_idx) + 1]
+
+    if file_type in ['pdf', 'word']:
+        heading = ""
+        for idx in heading_idx:
+            csv_row[idx] = csv_row[idx].strip()
+            heading += "" if csv_row[idx] == 'None' or not csv_row[idx] else csv_row[idx]
+        content = "" if csv_row[content_idx[0]] == 'None' or not csv_row[5] else csv_row[5]
+    else:
+        heading = ""
+        content = ""
+
+    return heading, content
+
+
+def get_heading_and_content2(csv_row, file_type, heading_idx, content_idx, ):
     if file_type in ['pdf']:
         csv_row[1] = csv_row[1].strip()
         csv_row[2] = csv_row[2].strip()
@@ -49,10 +94,14 @@ def get_summary_text_from_csv(csv_reader, file_type, max_length=2048):
 
     # Skip header row
     header = next(csv_reader)
+    heading_idx, content_idx = get_heading_and_content_idx(header)
+
     for row in csv_reader:
         heading, content = get_heading_and_content(
             csv_row=row,
             file_type=file_type,
+            heading_idx=heading_idx,
+            content_idx=content_idx,
         )
 
         heading = heading.translate(
@@ -136,11 +185,14 @@ def get_ner_text_from_csv(csv_reader, file_type, max_length=42):
     texts = list()
     # Skip header row
     header = next(csv_reader)
+    heading_idx, content_idx = get_heading_and_content_idx(header)
 
     for row in csv_reader:
         heading, content = get_heading_and_content(
             csv_row=row,
             file_type=file_type,
+            heading_idx=heading_idx,
+            content_idx=content_idx,
         )
 
         if len(texts) < max_length and heading:
