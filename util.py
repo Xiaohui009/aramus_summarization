@@ -36,7 +36,7 @@ def get_heading_and_content_idx(csv_header):
                     heading_idx.append(idx)
                 elif 'content' in value:
                     content_idx.append(idx)
-        idx += 1
+            idx += 1
     logging.info(f"Input header: {csv_header}")
     logging.info(f"Heading idx: {heading_idx}, content idx: {content_idx}")
 
