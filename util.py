@@ -60,7 +60,8 @@ def get_heading_and_content(csv_row, file_type, heading_idx, content_idx, ):
         for idx in heading_idx:
             csv_row[idx] = csv_row[idx].strip()
             heading += "" if csv_row[idx] == 'None' or not csv_row[idx] else csv_row[idx]
-        content = "" if csv_row[content_idx[0]] == 'None' or not csv_row[5] else csv_row[5]
+        idx = content_idx[0]
+        content = "" if csv_row[idx] == 'None' or not csv_row[idx] else csv_row[idx]
     else:
         heading = ""
         content = ""
